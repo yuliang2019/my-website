@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Michael's Portfolio</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background-color: #f4f4f4;
+            text-align: center;
+        }
+
+        .card {
+            background: white;
+            width: 350px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+
+        img {
+            width: 120px;
+            border-radius: 50%;
+        }
+
+        h1 {
+            margin: 10px 0;
+        }
+
+        .section {
+            margin-top: 20px;
+        }
+
+        button {
+            margin: 5px;
+            background: blue;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: darkblue;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="card">
+
+        <img src="https://media.licdn.com/dms/image/v2/C4E03AQF556xUGF5L6A/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1516957089408?e=1775088000&v=beta&t=RXOSzGPCPaME4teuLpFbPSW7tOSb2JeNvPp9PDkER5I" alt="头像" alt="头像">
+
+        <h1>Michael</h1>
+
+        <p>Frontend Learner 🚀</p>
+
+        <!-- 联系方式按钮 -->
+        <div class="section">
+            <button onclick="sendEmail()">📧 Email</button>
+            <button onclick="goLinkedIn()">💼 LinkedIn</button>
+            <button onclick="showWeChat()">💬 WeChat</button>
+        </div>
+
+        <!-- 技能 -->
+        <div class="section">
+            <h3>Skills</h3>
+            <p>HTML | CSS | JavaScript</p>
+        </div>
+
+        <!-- 项目 -->
+        <div class="section">
+            <h3>Projects</h3>
+            <p>✔ Personal Website</p>
+            <p>✔ Learning React (coming soon)</p>
+        </div>
+
+    </div>
+
+    <script>
+        function sendEmail() {
+            window.location.href = "mailto:yuliang2019@gmail.com";
+        }
+
+        function goLinkedIn() {
+            window.open("https://www.linkedin.com/in/%E4%BA%AE-%E4%BD%99-b09062143/", "_blank");
+        }
+
+        function showWeChat() {
+            alert("WeChat: yuliangv");
+        }
+    </script>
+
+</body>
+</html>
