@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TimeFlow 时间管理</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vant@4.8.0/lib/index.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vant@4.8.0/lib/index.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7f8fa; color: #323233; font-size: 14px; }
+    #app { min-height: 100vh; padding-bottom: 70px; }
+    .page { padding: 12px; }
+    .date-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding: 0 8px; }
+    .date-display { font-size: 16px; font-weight: 500; }
+    .timeline-list { background: #fff; border-radius: 8px; padding: 16px; }
+    .timeline-item { position: relative; padding-left: 24px; padding-bottom: 20px; border-left: 2px solid #eee; }
+    .timeline-item:last-child { border-left-color: transparent; padding-bottom: 0; }
+    .timeline-dot { position: absolute; left: -5px; top: 4px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; }
+    .timeline-content { background: #f7f8fa; border-radius: 8px; padding: 12px; cursor: pointer; }
+    .timeline-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .tag-name { font-weight: 600; font-size: 15px; }
+    .duration { font-size: 13px; color: #969799; }
+    .timeline-time { font-size: 13px; color: #646566; }
+    .timeline-remark { margin-top: 8px; font-size: 13px; color: #969799; padding-top: 8px; border-top: 1px dashed #ebedf0; }
+    .add-btn { position: fixed; right: 20px; bottom: 80px; width: 56px; height: 56px; border-radius: 28px; background: #1989fa; color: #fff; border: none; font-size: 28px; box-shadow: 0 4px 12px rgba(25,137,250,0.4); cursor: pointer; }
+    .chart-container { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .chart-title { font-size: 15px; text-align: center; margin-bottom: 16px; }
+    .chart-wrapper { position: relative; height: 240px; }
+    .chart-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; }
+    .total-duration { font-size: 24px; font-weight: 600; }
+    .total-label { font-size: 12px; color: #969799; margin-top: 4px; }
+    .stats-list { background: #fff; border-radius: 8px; overflow: hidden; }
+    .stats-item { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #ebedf0; cursor: pointer; }
+    .stats-item:last-child { border-bottom: none; }
+    .stats-color { width: 12px; height: 12px; border-radius: 3px; margin-right: 12px; }
+    .stats-info { flex: 1; }
+    .stats-name { font-size: 14px; }
+    .stats-duration { font-size: 12px; color: #969799; }
+    .stats-percent { font-size: 15px; font-weight: 600; }
+    .section { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .section h3 { font-size: 15px; margin-bottom: 12px; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; }
+    .section-header h3 { margin-bottom: 0; }
+    .tag-list { margin-top: 12px; }
+    .tag-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #ebedf0; }
+    .tag-item:last-child { border-bottom: none; }
+    .tag-color { width: 24px; height: 24px; border-radius: 6px; margin-right: 12px; }
+    .tag-name-setting { flex: 1; font-size: 14px; }
+    .tag-actions { display: flex; gap: 16px; color: #969799; }
+    .modal-content { height: 85%; display: flex; flex-direction: column; }
+    .record-form { flex: 1; padding: 16px; overflow-y: auto; }
+    .tag-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; color: #fff; font-size: 14px; }
+    .color-picker { display: flex; flex-wrap: wrap; gap: 12px; }
+    .color-option { width: 32px; height: 32px; border-radius: 6px; cursor: pointer; border: 3px solid transparent; }
+    .color-option.active { border-color: #323233; }
+    .date-selector { display: flex; gap: 8px; margin-bottom: 16px; justify-content: center; }
+    .empty-state { text-align: center; padding: 40px 0; color: #969799; }
+    .record-detail-item { display: flex; align-items: center; padding: 12px; background: #f7f8fa; border-radius: 8px; margin-bottom: 8px; }
+    .detail-date { font-size: 13px; color: #969799; width: 100px; }
+    .detail-time { flex: 1; font-size: 14px; }
+    .detail-duration { font-size: 14px; color: #1989fa; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部导航 -->
+    <div style="background:#fff;padding:0 16px;height:46px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:100;border-bottom:1px solid #ebedf0;">
+      <div style="width:40px;"></div>
+      <div style="font-size:16px;font-weight:500;">{{ currentTitle }}</div>
+      <div style="width:40px;text-align:center;cursor:pointer;" @click="showCalendar=true">
+        <span style="font-size:20px;">📅</span>
+      </div>
+    </div>
+
+    <!-- 时间轴页面 -->
+    <div v-if="activeTab==='timeline'" class="page" style="padding-top:60px;">
+      <div class="date-nav">
+        <button class="van-button van-button--default van-button--small" @click="prevDay">◀</button>
+        <span class="date-display" @click="showCalendar=true">{{ displayDate }}</span>
+        <button class="van-button van-button--default van-button--small" @click="nextDay">▶</button>
+      </div>
+      <div v-if="dayRecords.length>0" class="timeline-list">
+        <div v-for="r in dayRecords" :key="r.id" class="timeline-item">
+          <div class="timeline-dot" :style="{background:getTagColor(r.tag_id)}"></div>
+          <div class="timeline-content" @click="openEditRecord(r)">
+            <div class="timeline-header">
+              <span class="tag-name" :style="{color:getTagColor(r.tag_id)}">{{ getTagName(r.tag_id) }}</span>
+              <span class="duration">{{ formatDuration(r) }}</span>
+            </div>
+            <div class="timeline-time">{{ formatTime(r.start_time) }} - {{ formatTime(r.end_time) }}</div>
+            <div v-if="r.remark" class="timeline-remark">{{ r.remark }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-state">
+        <div style="font-size:48px;margin-bottom:12px;">⏰</div>
+        <div>今日暂无时间记录</div>
+        <div style="font-size:12px;margin-top:4px;">点击下方 + 按钮添加</div>
+      </div>
+      <button class="add-btn" @click="openAddRecord">+</button>
+    </div>
+
+    <!-- 统计页面 -->
+    <div v-if="activeTab==='stats'" class="page" style="padding-top:60px;">
+      <div class="date-selector">
+        <button :class="['van-button','van-button--default','van-button--small',{active:period==='day'}]" @click="period='day'">日</button>
+        <button :class="['van-button','van-button--default','van-button--small',{active:period==='week'}]" @click="period='week'">周</button>
+        <button :class="['van-button','van-button--default','van-button--small',{active:period==='month'}]" @click="period='month'">月</button>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">{{ selectedDate }} 时间分布</div>
+        <div v-if="chartStats.length>0" class="chart-wrapper">
+          <canvas ref="chartCanvas"></canvas>
+          <div class="chart-center">
+            <div class="total-duration">{{ formatMinutes(totalDuration) }}</div>
+            <div class="total-label">总时长</div>
+          </div>
+        </div>
+        <div v-else class="empty-state">暂无数据</div>
+      </div>
+      <div v-if="chartStats.length>0" class="stats-list">
+        <div v-for="s in chartStats" :key="s.tag_id" class="stats-item" @click="showTagDetail(s.tag_id)">
+          <div class="stats-color" :style="{background:s.color}"></div>
+          <div class="stats-info">
+            <div class="stats-name">{{ s.tag_name }}</div>
+            <div class="stats-duration">{{ formatMinutes(s.duration) }}</div>
+          </div>
+          <div class="stats-percent">{{ s.percentage }}%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置页面 -->
+    <div v-if="activeTab==='settings'" class="page" style="padding-top:60px;">
+      <div class="section">
+        <div class="section-header">
+          <h3>标签管理</h3>
+          <button class="van-button van-button--primary van-button--small van-button--plain" @click="openAddTag">添加</button>
+        </div>
+        <div class="tag-list">
+          <div v-for="tag in activeTags" :key="tag.id" class="tag-item">
+            <div class="tag-color" :style="{background:tag.color}"></div>
+            <div class="tag-name-setting">{{ tag.name }}</div>
+            <div class="tag-actions">
+              <span @click="openEditTag(tag)">✏️</span>
+              <span @click="handleDeleteTag(tag.id)">🗑️</span>
+            </div>
+          </div>
+          <div v-if="activeTags.length===0" class="empty-state">暂无标签</div>
+        </div>
+      </div>
+      <div class="section">
+        <h3>数据管理</h3>
+        <div class="van-cell van-cell--clickable" @click="handleExport"><div class="van-cell__title">导出数据</div><div class="van-cell__value">→</div></div>
+        <div class="van-cell van-cell--clickable" @click="importFile.click()"><div class="van-cell__title">导入数据</div><div class="van-cell__value">→</div></div>
+        <input type="file" ref="importFile" accept=".xlsx,.csv" style="display:none" @change="handleImport">
+      </div>
+      <div class="section">
+        <h3>关于</h3>
+        <div class="van-cell"><div class="van-cell__title">版本</div><div class="van-cell__value">1.0.0</div></div>
+      </div>
+    </div>
+
+    <!-- 底部标签栏 -->
+    <div style="position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #ebedf0;display:flex;z-index:100;">
+      <div :class="['tab-item',{active:activeTab==='timeline'}]" @click="activeTab='timeline'">
+        <div style="font-size:22px;">📋</div>
+        <div style="font-size:11px;">时间轴</div>
+      </div>
+      <div :class="['tab-item',{active:activeTab==='stats'}]" @click="activeTab='stats'">
+        <div style="font-size:22px;">📊</div>
+        <div style="font-size:11px;">统计</div>
+      </div>
+      <div :class="['tab-item',{active:activeTab==='settings'}]" @click="activeTab='settings'">
+        <div style="font-size:22px;">⚙️</div>
+        <div style="font-size:11px;">设置</div>
+      </div>
+    </div>
+
+    <!-- 日历弹窗 -->
+    <div v-if="showCalendar" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-end;" @click.self="showCalendar=false">
+      <div style="background:#fff;width:100%;border-radius:16px 16px 0 0;padding:16px;">
+        <div style="text-align:center;font-size:16px;font-weight:500;margin-bottom:12px;">选择日期</div>
+        <input type="date" v-model="selectedDate" style="width:100%;padding:12px;font-size:16px;border:1px solid #ebedf0;border-radius:8px;" @change="showCalendar=false">
+        <button class="van-button van-button--primary" style="width:100%;margin-top:12px;" @click="showCalendar=false">确定</button>
+      </div>
+    </div>
+
+    <!-- 记录编辑弹窗 -->
+    <div v-if="showRecordModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;" @click.self="showRecordModal=false">
+      <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;height:85%;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #ebedf0;">
+          <span style="color:#969799;" @click="showRecordModal=false">取消</span>
+          <span style="font-weight:500;">{{ isEditRecord?'编辑记录':'添加记录' }}</span>
+          <span style="color:#1989fa;" @click="saveRecord">保存</span>
+        </div>
+        <div style="padding:16px;overflow-y:auto;height:calc(100% - 56px);">
+          <div class="van-cell van-cell--clickable" @click="showTagSelect=true">
+            <div class="van-cell__title">标签</div>
+            <div class="van-cell__value"><span v-if="recordForm.tag_id" class="tag-badge" :style="{background:getTagColor(recordForm.tag_id)}">{{ getTagName(recordForm.tag_id) }}</span><span v-else style="color:#969799;">请选择</span></div>
+          </div>
+          <div class="van-cell van-cell--clickable" @click="showStartPicker=true">
+            <div class="van-cell__title">开始时间</div>
+            <div class="van-cell__value">{{ recordForm.start_time }}</div>
+          </div>
+          <div class="van-cell van-cell--clickable" @click="showEndPicker=true">
+            <div class="van-cell__title">结束时间</div>
+            <div class="van-cell__value">{{ recordForm.end_time }}</div>
+          </div>
+          <div style="margin-top:12px;">
+            <div style="color:#646566;padding:10px 0;">备注</div>
+            <textarea v-model="recordForm.remark" placeholder="添加备注..." style="width:100%;border:1px solid #ebedf0;border-radius:8px;padding:12px;resize:none;min-height:80px;font-size:14px;"></textarea>
+          </div>
+          <button v-if="isEditRecord" class="van-button van-button--danger van-button--block" style="margin-top:24px;" @click="deleteRecord">删除记录</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 标签选择 -->
+    <div v-if="showTagSelect" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:flex-end;" @click.self="showTagSelect=false">
+      <div style="background:#fff;width:100%;border-radius:16px 16px 0 0;padding:16px;">
+        <div style="text-align:center;font-size:16px;font-weight:500;margin-bottom:12px;">选择标签</div>
+        <div v-for="tag in activeTags" :key="tag.id" style="padding:14px 0;border-bottom:1px solid #ebedf0;display:flex;align-items:center;" @click="recordForm.tag_id=tag.id;showTagSelect=false">
+          <div class="tag-color" :style="{background:tag.color}"></div>
+          <span style="flex:1;">{{ tag.name }}</span>
+          <span v-if="recordForm.tag_id===tag.id" style="color:#1989fa;">✓</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 时间选择 -->
+    <div v-if="showStartPicker" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:flex-end;" @click.self="showStartPicker=false">
+      <div style="background:#fff;width:100%;border-radius:16px 16px 0 0;padding:16px;">
+        <div style="text-align:center;font-size:16px;font-weight:500;margin-bottom:12px;">开始时间</div>
+        <input type="time" v-model="recordForm.start_time" style="width:100%;padding:12px;font-size:16px;border:1px solid #ebedf0;border-radius:8px;" step="300">
+        <button class="van-button van-button--primary" style="width:100%;margin-top:12px;" @click="showStartPicker=false">确定</button>
+      </div>
+    </div>
+    <div v-if="showEndPicker" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:flex-end;" @click.self="showEndPicker=false">
+      <div style="background:#fff;width:100%;border-radius:16px 16px 0 0;padding:16px;">
+        <div style="text-align:center;font-size:16px;font-weight:500;margin-bottom:12px;">结束时间</div>
+        <input type="time" v-model="recordForm.end_time" style="width:100%;padding:12px;font-size:16px;border:1px solid #ebedf0;border-radius:8px;" step="300">
+        <button class="van-button van-button--primary" style="width:100%;margin-top:12px;" @click="showEndPicker=false">确定</button>
+      </div>
+    </div>
+
+    <!-- 标签编辑弹窗 -->
+    <div v-if="showTagModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;" @click.self="showTagModal=false">
+      <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;height:300px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #ebedf0;">
+          <span style="color:#969799;" @click="showTagModal=false">取消</span>
+          <span style="font-weight:500;">{{ isEditTag?'编辑标签':'添加标签' }}</span>
+          <span style="color:#1989fa;" @click="saveTag">保存</span>
+        </div>
+        <div style="padding:16px;">
+          <div style="margin-bottom:16px;">
+            <div style="color:#646566;margin-bottom:8px;">标签名称</div>
+            <input v-model="tagForm.name" placeholder="请输入标签名称" style="width:100%;padding:10px;border:1px solid #ebedf0;border-radius:8px;font-size:14px;">
+          </div>
+          <div>
+            <div style="color:#646566;margin-bottom:8px;">标签颜色</div>
+            <div class="color-picker">
+              <div v-for="c in colorOptions" :key="c" :class="['color-option',{active:tagForm.color===c}]" :style="{background:c}" @click="tagForm.color=c"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 标签明细弹窗 -->
+    <div v-if="showDetailModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;" @click.self="showDetailModal=false">
+      <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;height:70%;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #ebedf0;">
+          <span style="color:#969799;" @click="showDetailModal=false">关闭</span>
+          <span style="font-weight:500;">{{ detailTagName }} 明细</span>
+          <div style="width:40px;"></div>
+        </div>
+        <div style="padding:12px;overflow-y:auto;height:calc(100% - 56px);">
+          <div v-for="r in tagDetailRecords" :key="r.id" class="record-detail-item">
+            <div class="detail-date">{{ r.date }}</div>
+            <div class="detail-time">{{ formatTime(r.start_time) }} - {{ formatTime(r.end_time) }}</div>
+            <div class="detail-duration">{{ formatDuration(r) }}</div>
+          </div>
+          <div v-if="tagDetailRecords.length===0" class="empty-state">暂无记录</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted, watch, nextTick } = Vue
+
+    createApp({
+      setup() {
+        // 数据
+        const tags = ref([])
+        const records = ref([])
+        const activeTab = ref('timeline')
+        const selectedDate = ref(new Date().toISOString().split('T')[0])
+        const showCalendar = ref(false)
+        const period = ref('day')
+
+        // 弹窗状态
+        const showRecordModal = ref(false)
+        const showTagSelect = ref(false)
+        const showStartPicker = ref(false)
+        const showEndPicker = ref(false)
+        const showTagModal = ref(false)
+        const showDetailModal = ref(false)
+        const isEditRecord = ref(false)
+        const isEditTag = ref(false)
+        const editingRecordId = ref(null)
+        const editingTagId = ref(null)
+
+        // 表单
+        const recordForm = ref({ tag_id: null, start_time: '09:00', end_time: '10:00', remark: '' })
+        const tagForm = ref({ name: '', color: '#1989fa' })
+
+        // 明细
+        const detailTagName = ref('')
+        const tagDetailRecords = ref([])
+
+        // 图表
+        const chartCanvas = ref(null)
+        let chartInstance = null
+
+        const colorOptions = ['#1989fa', '#07c160', '#ff976a', '#ed6a0c', '#bb2649', '#722ed1', '#eb苔a8', '#00b42a', '#ff4d4f', '#faad14', '#52c41a', '#13c2c2']
+
+        // 计算属性
+        const currentTitle = computed(() => {
+          if (activeTab.value === 'timeline') return selectedDate.value === new Date().toISOString().split('T')[0] ? '今日时间轴' : selectedDate.value
+          if (activeTab.value === 'stats') return '数据统计'
+          return '设置'
+        })
+
+        const displayDate = computed(() => {
+          const today = new Date().toISOString().split('T')[0]
+          if (selectedDate.value === today) return '今天'
+          const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+          if (selectedDate.value === yesterday) return '昨天'
+          return selectedDate.value
+        })
+
+        const activeTags = computed(() => tags.value.filter(t => !t.is_archived))
+        const dayRecords = computed(() => records.value.filter(r => r.date === selectedDate.value).sort((a, b) => a.start_time.localeCompare(b.start_time)))
+
+        const chartStats = computed(() => {
+          const stats = []
+          const tagMap = new Map(activeTags.value.map(t => [t.id, t]))
+          const byTag = {}
+          dayRecords.value.forEach(r => {
+            const tag = tagMap.get(r.tag_id)
+            if (tag) {
+              const duration = (parseTime(r.end_time) - parseTime(r.start_time)) / 60000
+              if (!byTag[r.tag_id]) byTag[r.tag_id] = { tag_id: r.tag_id, tag_name: tag.name, color: tag.color, duration: 0 }
+              byTag[r.tag_id].duration += duration
+            }
+          })
+          const total = Object.values(byTag).reduce((s, v) => s + v.duration, 0)
+          Object.values(byTag).forEach(s => s.percentage = total > 0 ? (s.duration / total * 100).toFixed(1) : 0)
+          return Object.values(byTag).sort((a, b) => b.duration - a.duration)
+        })
+
+        const totalDuration = computed(() => chartStats.value.reduce((s, v) => s + v.duration, 0))
+
+        // 方法
+        function parseTime(t) {
+          const [h, m] = t.split(':').map(Number)
+          const d = new Date(selectedDate.value + 'T00:00:00')
+          d.setHours(h, m, 0, 0)
+          return d.getTime()
+        }
+
+        function getTagName(tagId) {
+          const tag = tags.value.find(t => t.id === tagId)
+          return tag?.name || '未知'
+        }
+
+        function getTagColor(tagId) {
+          const tag = tags.value.find(t => t.id === tagId)
+          return tag?.color || '#1989fa'
+        }
+
+        function formatTime(t) { return t }
+
+        function formatDuration(r) {
+          const ms = parseTime(r.end_time) - parseTime(r.start_time)
+          const mins = ms / 60000
+          if (mins < 60) return `${Math.round(mins)}分钟`
+          const h = Math.floor(mins / 60), m = Math.round(mins % 60)
+          return m > 0 ? `${h}小时${m}分钟` : `${h}小时`
+        }
+
+        function formatMinutes(mins) {
+          if (mins < 60) return `${Math.round(mins)}分钟`
+          const h = Math.floor(mins / 60), m = Math.round(mins % 60)
+          return m > 0 ? `${h}小时${m}分钟` : `${h}小时`
+        }
+
+        function prevDay() {
+          const d = new Date(selectedDate.value)
+          d.setDate(d.getDate() - 1)
+          selectedDate.value = d.toISOString().split('T')[0]
+        }
+
+        function nextDay() {
+          const d = new Date(selectedDate.value)
+          d.setDate(d.getDate() + 1)
+          selectedDate.value = d.toISOString().split('T')[0]
+        }
+
+        // 记录操作
+        function openAddRecord() {
+          isEditRecord.value = false
+          editingRecordId.value = null
+          recordForm.value = { tag_id: activeTags.value[0]?.id || null, start_time: '09:00', end_time: '10:00', remark: '' }
+          showRecordModal.value = true
+        }
+
+        function openEditRecord(r) {
+          isEditRecord.value = true
+          editingRecordId.value = r.id
+          recordForm.value = { tag_id: r.tag_id, start_time: r.start_time, end_time: r.end_time, remark: r.remark }
+          showRecordModal.value = true
+        }
+
+        async function saveRecord() {
+          if (!recordForm.value.tag_id) { alert('请选择标签'); return }
+          if (recordForm.value.end_time <= recordForm.value.start_time) { alert('结束时间必须大于开始时间'); return }
+          const newRecord = { tag_id: recordForm.value.tag_id, start_time: recordForm.value.start_time, end_time: recordForm.value.end_time, remark: recordForm.value.remark, date: selectedDate.value }
+          if (isEditRecord.value) {
+            const idx = records.value.findIndex(r => r.id === editingRecordId.value)
+            if (idx > -1) records.value[idx] = { ...records.value[idx], ...newRecord }
+          } else {
+            newRecord.id = Date.now()
+            records.value.push(newRecord)
+          }
+          await saveToStorage()
+          showRecordModal.value = false
+        }
+
+        async function deleteRecord() {
+          if (confirm('确定删除这条记录?')) {
+            records.value = records.value.filter(r => r.id !== editingRecordId.value)
+            await saveToStorage()
+            showRecordModal.value = false
+          }
+        }
+
+        // 标签操作
+        function openAddTag() {
+          isEditTag.value = false
+          editingTagId.value = null
+          tagForm.value = { name: '', color: '#1989fa' }
+          showTagModal.value = true
+        }
+
+        function openEditTag(tag) {
+          isEditTag.value = true
+          editingTagId.value = tag.id
+          tagForm.value = { name: tag.name, color: tag.color }
+          showTagModal.value = true
+        }
+
+        async function saveTag() {
+          if (!tagForm.value.name.trim()) { alert('请输入标签名称'); return }
+          if (isEditTag.value) {
+            const idx = tags.value.findIndex(t => t.id === editingTagId.value)
+            if (idx > -1) tags.value[idx] = { ...tags.value[idx], name: tagForm.value.name, color: tagForm.value.color }
+          } else {
+            tags.value.push({ id: Date.now(), name: tagForm.value.name, color: tagForm.value.color, is_archived: 0, sort_order: tags.value.length + 1 })
+          }
+          await saveToStorage()
+          showTagModal.value = false
+        }
+
+        async function handleDeleteTag(id) {
+          if (confirm('删除标签将同时删除该标签下的所有记录，确定删除?')) {
+            tags.value = tags.value.filter(t => t.id !== id)
+            records.value = records.value.filter(r => r.tag_id !== id)
+            await saveToStorage()
+          }
+        }
+
+        // 统计
+        function showTagDetail(tagId) {
+          const tag = tags.value.find(t => t.id === tagId)
+          detailTagName.value = tag?.name || ''
+          tagDetailRecords.value = records.value.filter(r => r.tag_id === tagId)
+          showDetailModal.value = true
+        }
+
+        // 导入导出
+        async function handleExport() {
+          if (records.value.length === 0) { alert('暂无数据可导出'); return }
+          const tagMap = new Map(tags.value.map(t => [t.id, t]))
+          const exportData = records.value.map(r => {
+            const tag = tagMap.get(r.tag_id)
+            return { '日期': r.date, '标签': tag?.name || '未知', '开始时间': r.start_time, '结束时间': r.end_time, '时长': formatDuration(r), '备注': r.remark || '' }
+          })
+          const ws = XLSX.utils.json_to_sheet(exportData)
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, '时间记录')
+          XLSX.writeFile(wb, `时间记录_${selectedDate.value}.xlsx`)
+        }
+
+        function handleImport(e) {
+          const file = e.target.files[0]
+          if (!file) return
+          const reader = new FileReader()
+          reader.onload = (ev) => {
+            try {
+              const data = new Uint8Array(ev.target.result)
+              const wb = XLSX.read(data, { type: 'array' })
+              const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])
+              alert(`已读取 ${jsonData.length} 条记录，导入功能开发中`)
+            } catch (err) { alert('文件解析失败') }
+          }
+          reader.readAsArrayBuffer(file)
+        }
+
+        // 存储
+        async function saveToStorage() {
+          localStorage.setItem('timeflow_tags', JSON.stringify(tags.value))
+          localStorage.setItem('timeflow_records', JSON.stringify(records.value))
+          updateChart()
+        }
+
+        async function loadFromStorage() {
+          const savedTags = localStorage.getItem('timeflow_tags')
+          const savedRecords = localStorage.getItem('timeflow_records')
+          if (savedTags) tags.value = JSON.parse(savedTags)
+          if (savedRecords) records.value = JSON.parse(savedRecords)
+          if (tags.value.length === 0) {
+            tags.value = [
+              { id: 1, name: '工作', color: '#1989fa', is_archived: 0, sort_order: 1 },
+              { id: 2, name: '学习', color: '#07c160', is_archived: 0, sort_order: 2 },
+              { id: 3, name: '运动', color: '#ff976a', is_archived: 0, sort_order: 3 },
+              { id: 4, name: '休息', color: '#ed6a0c', is_archived: 0, sort_order: 4 }
+            ]
+            await saveToStorage()
+          }
+        }
+
+        // 图表
+        function updateChart() {
+          nextTick(() => {
+            if (!chartCanvas.value) return
+            if (chartInstance) chartInstance.destroy()
+            if (chartStats.value.length === 0) return
+            chartInstance = new Chart(chartCanvas.value, {
+              type: 'doughnut',
+              data: {
+                labels: chartStats.value.map(s => s.tag_name),
+                datasets: [{ data: chartStats.value.map(s => s.duration), backgroundColor: chartStats.value.map(s => s.color), borderWidth: 0 }]
+              },
+              options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } }
+            })
+          })
+        }
+
+        watch(activeTab, () => { if (activeTab.value === 'stats') updateChart() })
+        watch(chartStats, updateChart)
+
+        onMounted(async () => {
+          await loadFromStorage()
+        })
+
+        return {
+          tags, records, activeTab, selectedDate, showCalendar, period,
+          showRecordModal, showTagSelect, showStartPicker, showEndPicker, showTagModal, showDetailModal,
+          isEditRecord, isEditTag, recordForm, tagForm, colorOptions,
+          detailTagName, tagDetailRecords, chartCanvas, importFile: ref(null),
+          currentTitle, displayDate, activeTags, dayRecords, chartStats, totalDuration,
+          prevDay, nextDay, getTagName, getTagColor, formatTime, formatDuration, formatMinutes,
+          openAddRecord, openEditRecord, saveRecord, deleteRecord,
+          openAddTag, openEditTag, saveTag, handleDeleteTag,
+          showTagDetail, handleExport, handleImport
+        }
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>
